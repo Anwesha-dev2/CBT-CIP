@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 using namespace std;
 
@@ -10,23 +11,36 @@ public:
     string department;
     string grade;
 
-    void inputData() {
-        cout << "Enter Roll Number: ";
-        cin >> rollNumber;
+    void inputData(bool askRoll = true) {
+        if (askRoll) {
+            cout << "Enter Roll Number: ";
+            cin >> rollNumber;
+            cin.ignore();
+        }
         cout << "Enter Name: ";
-        cin.ignore(); // To ignore leftover newline character
         getline(cin, name);
         cout << "Enter Department: ";
-        cin >> department;
+        getline(cin, department);
         cout << "Enter Grade: ";
-        cin >> grade;
+        getline(cin, grade);
     }
 
-    void displayData() {
-        cout << "Roll Number: " << rollNumber << endl;
-        cout << "Name: " << name << endl;
-        cout << "Department: " << department << endl;
-        cout << "Grade: " << grade << endl;
+    void displayData() const {
+        cout << rollNumber << "\t" << name << "\t" << department << "\t" << grade << endl;
+    }
+
+    string toCSV() const {
+        return rollNumber + "," + name + "," + department + "," + grade;
+    }
+
+    static Student fromCSV(const string& line) {
+        Student s;
+        stringstream ss(line);
+        getline(ss, s.rollNumber, ',');
+        getline(ss, s.name, ',');
+        getline(ss, s.department, ',');
+        getline(ss, s.grade, ',');
+        return s;
     }
 };
 
@@ -34,33 +48,46 @@ void addRecord() {
     ofstream file("StudentRecords.txt", ios::app);
     Student student;
     student.inputData();
-    file << student.rollNumber << " " << student.name << " " 
-         << student.department << " " << student.grade << endl;
+    file << student.toCSV() << endl;
     file.close();
     cout << "Record added successfully!" << endl;
 }
 
 void displayRecords() {
     ifstream file("StudentRecords.txt");
+    if (!file) {
+        cout << "No records found." << endl;
+        return;
+    }
+
     string line;
+    cout << "RollNo\tName\tDepartment\tGrade" << endl;
+    cout << "----------------------------------------" << endl;
     while (getline(file, line)) {
-        cout << line << endl;
+        Student s = Student::fromCSV(line);
+        s.displayData();
     }
     file.close();
 }
 
 void searchRecord(const string& rollNumber) {
     ifstream file("StudentRecords.txt");
-    string r, n, d, g;
+    if (!file) {
+        cout << "No records found." << endl;
+        return;
+    }
+
+    string line;
     bool found = false;
 
-    while (file >> r >> n >> d >> g) {
-        if (r == rollNumber) {
+    while (getline(file, line)) {
+        Student s = Student::fromCSV(line);
+        if (s.rollNumber == rollNumber) {
             cout << "Record Found:\n";
-            cout << "Roll Number: " << r << endl;
-            cout << "Name: " << n << endl;
-            cout << "Department: " << d << endl;
-            cout << "Grade: " << g << endl;
+            cout << "Roll Number: " << s.rollNumber << endl;
+            cout << "Name: " << s.name << endl;
+            cout << "Department: " << s.department << endl;
+            cout << "Grade: " << s.grade << endl;
             found = true;
             break;
         }
@@ -74,22 +101,25 @@ void searchRecord(const string& rollNumber) {
 
 void updateRecord(const string& rollNumber) {
     ifstream file("StudentRecords.txt");
+    if (!file) {
+        cout << "No records to update." << endl;
+        return;
+    }
+
     ofstream tempFile("TempRecords.txt");
-    string r, n, d, g;
+    string line;
     bool found = false;
 
-    while (file >> r >> n >> d >> g) {
-        if (r == rollNumber) {
+    while (getline(file, line)) {
+        Student s = Student::fromCSV(line);
+        if (s.rollNumber == rollNumber) {
             found = true;
-            cout << "Enter new details:\n";
-            Student student;
-            student.inputData();
-            tempFile << student.rollNumber << " " << student.name << " " 
-                     << student.department << " " << student.grade << endl;
-        } else {
-            tempFile << r << " " << n << " " << d << " " << g << endl;
+            cout << "Enter new details (roll number cannot be changed):" << endl;
+            s.inputData(false);  // Don't ask for roll number again
         }
+        tempFile << s.toCSV() << endl;
     }
+
     file.close();
     tempFile.close();
 
@@ -98,8 +128,8 @@ void updateRecord(const string& rollNumber) {
         rename("TempRecords.txt", "StudentRecords.txt");
         cout << "Record updated successfully!" << endl;
     } else {
-        cout << "Record not found!" << endl;
         remove("TempRecords.txt");
+        cout << "Record not found!" << endl;
     }
 }
 
@@ -116,6 +146,7 @@ int main() {
         cout << "5. Exit\n";
         cout << "Enter your choice: ";
         cin >> choice;
+        cin.ignore(); // Clear input buffer for getline()
 
         switch (choice) {
             case 1:
@@ -126,12 +157,12 @@ int main() {
                 break;
             case 3:
                 cout << "Enter Roll Number to Search: ";
-                cin >> rollNumber;
+                getline(cin, rollNumber);
                 searchRecord(rollNumber);
                 break;
             case 4:
                 cout << "Enter Roll Number to Update: ";
-                cin >> rollNumber;
+                getline(cin, rollNumber);
                 updateRecord(rollNumber);
                 break;
             case 5:
